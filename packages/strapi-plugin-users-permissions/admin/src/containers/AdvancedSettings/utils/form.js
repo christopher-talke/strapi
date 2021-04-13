@@ -47,6 +47,13 @@ const form = [
     size: { xs: 6 },
     placeholder: 'ex: https://yourfrontend.com/reset-password',
   },
+  {
+    description: getTrad('EditForm.inputToggle.description.use-http-cookies'),
+    label: getTrad('EditForm.inputToggle.label.use-http-cookies'),
+    name: 'use_http_cookies',
+    type: 'bool',
+    size: { xs: 12 },
+  },
 ];
 
 export default form;

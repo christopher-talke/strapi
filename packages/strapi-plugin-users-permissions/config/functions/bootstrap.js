@@ -197,6 +197,7 @@ module.exports = async () => {
       email_reset_password: null,
       email_confirmation_redirection: null,
       default_role: 'authenticated',
+      use_http_cookies: false,
     };
 
     await pluginStore.set({ key: 'advanced', value });

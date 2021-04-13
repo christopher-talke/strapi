@@ -128,14 +128,33 @@ module.exports = {
           })
         );
       } else {
-        ctx.send({
-          jwt: strapi.plugins['users-permissions'].services.jwt.issue({
-            id: user.id,
-          }),
-          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
-            model: strapi.query('user', 'users-permissions').model,
-          }),
+        const token = strapi.plugins['users-permissions'].services.jwt.issue({
+          id: user.id,
         });
+
+        if (await store.get({ key: 'advanced' }, 'use_http_cookies')) {
+          ctx.cookies.set('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production' ? true : false,
+            maxAge: 1000 * 60 * 60 * 24 * 14,
+            domain:
+              process.env.NODE_ENV === 'development' ? 'localhost' : process.env.PRODUCTION_URL,
+          });
+
+          ctx.send({
+            user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+              model: strapi.query('user', 'users-permissions').model,
+            }),
+          });
+        } else {
+          ctx.send({
+            jwt: token,
+            test: await store.get({ key: 'advanced' }, 'use_http_cookies'),
+            user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+              model: strapi.query('user', 'users-permissions').model,
+            }),
+          });
+        }
       }
     } else {
       if (!_.get(await store.get({ key: 'grant' }), [provider, 'enabled'])) {
@@ -163,19 +182,50 @@ module.exports = {
         return ctx.badRequest(null, error === 'array' ? error[0] : error);
       }
 
-      ctx.send({
-        jwt: strapi.plugins['users-permissions'].services.jwt.issue({
-          id: user.id,
-        }),
-        user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
-          model: strapi.query('user', 'users-permissions').model,
-        }),
+      const token = strapi.plugins['users-permissions'].services.jwt.issue({
+        id: user.id,
       });
+
+      if (await store.get({ key: 'advanced' }, 'use_http_cookies')) {
+        ctx.cookies.set('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production' ? true : false,
+          maxAge: 1000 * 60 * 60 * 24 * 14,
+          domain: process.env.NODE_ENV === 'development' ? 'localhost' : process.env.PRODUCTION_URL,
+        });
+
+        ctx.send({
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      } else {
+        ctx.send({
+          jwt: token,
+          test: await store.get({ key: 'advanced' }, 'use_http_cookies'),
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      }
     }
+  },
+
+  async logout(ctx) {
+    ctx.cookies.set('token', null);
+    ctx.send({
+      message: 'Successfully logged out',
+    });
   },
 
   async resetPassword(ctx) {
     const params = _.assign({}, ctx.request.body, ctx.params);
+
+    const store = await strapi.store({
+      environment: '',
+      type: 'plugin',
+      name: 'users-permissions',
+    });
 
     if (
       params.password &&
@@ -206,14 +256,31 @@ module.exports = {
         .query('user', 'users-permissions')
         .update({ id: user.id }, { resetPasswordToken: null, password });
 
-      ctx.send({
-        jwt: strapi.plugins['users-permissions'].services.jwt.issue({
-          id: user.id,
-        }),
-        user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
-          model: strapi.query('user', 'users-permissions').model,
-        }),
+      const token = strapi.plugins['users-permissions'].services.jwt.issue({
+        id: user.id,
       });
+
+      if (await store.get({ key: 'advanced' }, 'use_http_cookies')) {
+        ctx.cookies.set('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production' ? true : false,
+          maxAge: 1000 * 60 * 60 * 24 * 14,
+          domain: process.env.NODE_ENV === 'development' ? 'localhost' : process.env.PRODUCTION_URL,
+        });
+
+        ctx.send({
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      } else {
+        ctx.send({
+          jwt: token,
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      }
     } else if (
       params.password &&
       params.passwordConfirmation &&
@@ -525,6 +592,12 @@ module.exports = {
   async emailConfirmation(ctx, next, returnUser) {
     const { confirmation: confirmationToken } = ctx.query;
 
+    const store = await strapi.store({
+      environment: '',
+      type: 'plugin',
+      name: 'users-permissions',
+    });
+
     const { user: userService, jwt: jwtService } = strapi.plugins['users-permissions'].services;
 
     if (_.isEmpty(confirmationToken)) {
@@ -537,15 +610,34 @@ module.exports = {
       return ctx.badRequest('token.invalid');
     }
 
+    const token = jwtService.issue({
+      id: user.id,
+    });
+
     await userService.edit({ id: user.id }, { confirmed: true, confirmationToken: null });
 
     if (returnUser) {
-      ctx.send({
-        jwt: jwtService.issue({ id: user.id }),
-        user: sanitizeEntity(user, {
-          model: strapi.query('user', 'users-permissions').model,
-        }),
-      });
+      if (await store.get({ key: 'advanced' }, 'use_http_cookies')) {
+        ctx.cookies.set('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production' ? true : false,
+          maxAge: 1000 * 60 * 60 * 24 * 14,
+          domain: process.env.NODE_ENV === 'development' ? 'localhost' : process.env.PRODUCTION_URL,
+        });
+
+        ctx.send({
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      } else {
+        ctx.send({
+          jwt: token,
+          user: sanitizeEntity(user.toJSON ? user.toJSON() : user, {
+            model: strapi.query('user', 'users-permissions').model,
+          }),
+        });
+      }
     } else {
       const settings = await strapi
         .store({
